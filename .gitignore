@@ -1,0 +1,9 @@
+.dotnet/
+.dotnet-sdk/
+dist/
+bin/
+obj/
+*.user
+*.log
+dotnet-sdk-*.zip
+releases-10.json

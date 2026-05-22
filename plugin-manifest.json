@@ -1,0 +1,21 @@
+{
+  "id": "v2rayn.cloudflare-auto-switch",
+  "name": "v2rayN Cloudflare Auto Switch Companion",
+  "version": "0.1.0",
+  "type": "sidecar",
+  "entry": "v2rayN.AutoSwitchCompanion.exe",
+  "requires": {
+    "host": "v2rayN",
+    "placement": "same-directory-as-v2rayN.exe",
+    "dotnet": "10.0-windows"
+  },
+  "capabilities": [
+    "cloudflare-workers-analytics",
+    "v2rayn-subscription-group-switch",
+    "v2rayn-mixed-speedtest"
+  ],
+  "notes": [
+    "v2rayN has no official in-process plugin loader; this package runs as a sidecar companion.",
+    "The sidecar uses v2rayN ServiceLib and must be deployed next to v2rayN.exe."
+  ]
+}

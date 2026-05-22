@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <UseWindowsForms>true</UseWindowsForms>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <AssemblyName>v2rayN.AutoSwitchCompanion</AssemblyName>
+        <RootNamespace>v2rayN.AutoSwitchCompanion</RootNamespace>
+        <AssemblyTitle>CloudFlarePlus For v2rayN</AssemblyTitle>
+        <Product>CloudFlarePlus For v2rayN</Product>
+        <FileDescription>CloudFlarePlus For v2rayN Auto Switch Companion</FileDescription>
+        <Company>ykdbc</Company>
+        <ApplicationIcon>Assets\AutoSwitchCompanion.ico</ApplicationIcon>
+        <V2rayNSourceRoot Condition="'$(V2rayNSourceRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\..\v2rayN\v2rayN'))</V2rayNSourceRoot>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Assets\AutoSwitchCompanion.ico" />
+        <Content Include="Assets\AutoSwitchCompanion.ico" CopyToOutputDirectory="PreserveNewest" TargetPath="AutoSwitchCompanion.ico" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="$(V2rayNSourceRoot)\ServiceLib\ServiceLib.csproj" />
+    </ItemGroup>
+
+</Project>

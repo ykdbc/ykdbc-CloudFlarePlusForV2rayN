@@ -1,0 +1,27 @@
+{
+  "autoRestartV2rayN": true,
+  "defaultCheckIntervalMinutes": 1,
+  "speedTestTimeoutMinutes": 20,
+  "speedTestUrl": "https://cdn.cloudflare.steamstatic.com/steam/apps/256843155/movie_max.mp4",
+  "language": "zh-CN",
+  "rules": [
+    {
+      "enabled": true,
+      "name": "worker-a",
+      "groupName": "Cloudflare-A",
+      "apiToken": "paste-token-a-here",
+      "accountId": "",
+      "scriptName": "",
+      "thresholdRequests": 90000
+    },
+    {
+      "enabled": true,
+      "name": "worker-b",
+      "groupName": "Cloudflare-B",
+      "apiToken": "paste-token-b-here",
+      "accountId": "",
+      "scriptName": "",
+      "thresholdRequests": 90000
+    }
+  ]
+}
