@@ -27,6 +27,8 @@ public sealed class UiText
         Speed = "速度",
         AddRule = "添加规则",
         RemoveRule = "删除规则",
+        DeleteRuleConfirmTitle = "确认删除",
+        DeleteRuleConfirmMessageFormat = "确定要删除这条规则吗？\n\n显示名称：{0}\n分组：{1}",
         Save = "保存",
         CheckNow = "立即检查",
         StartMonitor = "启动监控",
@@ -71,6 +73,8 @@ public sealed class UiText
         Speed = "Speed",
         AddRule = "Add rule",
         RemoveRule = "Remove rule",
+        DeleteRuleConfirmTitle = "Confirm delete",
+        DeleteRuleConfirmMessageFormat = "Delete this rule?\n\nName: {0}\nGroup: {1}",
         Save = "Save",
         CheckNow = "Check now",
         StartMonitor = "Start monitor",
@@ -113,6 +117,8 @@ public sealed class UiText
     public required string Speed { get; init; }
     public required string AddRule { get; init; }
     public required string RemoveRule { get; init; }
+    public required string DeleteRuleConfirmTitle { get; init; }
+    public required string DeleteRuleConfirmMessageFormat { get; init; }
     public required string Save { get; init; }
     public required string CheckNow { get; init; }
     public required string StartMonitor { get; init; }

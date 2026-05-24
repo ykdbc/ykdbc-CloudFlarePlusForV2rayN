@@ -131,11 +131,13 @@ internal static class Program
 
             var client = new CloudflareAnalyticsClient();
             var hasFailure = false;
+            var verifiedTokenChanged = false;
             foreach (var rule in rules)
             {
                 try
                 {
                     var usage = await client.GetTodayUsageAsync(rule, CancellationToken.None);
+                    verifiedTokenChanged |= rule.MarkApiTokenVerified();
                     lines.Add($"{rule.GroupName}: used {usage.Requests:N0}/{CompanionSettings.CloudflareFreeDailyLimit:N0}, remaining {usage.RemainingRequests:N0}, configured threshold {rule.ThresholdRequests:N0}, subrequests={usage.Subrequests:N0}, errors={usage.Errors:N0}");
                 }
                 catch (Exception ex)
@@ -143,6 +145,11 @@ internal static class Program
                     hasFailure = true;
                     lines.Add($"{rule.GroupName}: Cloudflare usage query failed: {ex.Message}");
                 }
+            }
+
+            if (verifiedTokenChanged)
+            {
+                SettingsStore.Save(settings);
             }
 
             lines.Add(hasFailure

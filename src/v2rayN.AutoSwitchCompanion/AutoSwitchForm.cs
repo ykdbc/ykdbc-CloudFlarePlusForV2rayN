@@ -214,8 +214,11 @@ public sealed class AutoSwitchForm : Form
         _rulesGrid.AllowUserToDeleteRows = true;
         _rulesGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         _rulesGrid.MultiSelect = false;
+        _rulesGrid.ClipboardCopyMode = DataGridViewClipboardCopyMode.Disable;
         _rulesGrid.DataSource = _rules;
         _rulesGrid.CellValueChanged += (_, e) => SaveAndRefreshFloatingUsage(e.ColumnIndex);
+        _rulesGrid.CellBeginEdit += RulesGridCellBeginEdit;
+        _rulesGrid.CellFormatting += RulesGridCellFormatting;
         _rulesGrid.EditingControlShowing += RulesGridEditingControlShowing;
         _rulesGrid.CurrentCellDirtyStateChanged += (_, _) =>
         {
@@ -236,7 +239,13 @@ public sealed class AutoSwitchForm : Form
         });
         _rulesGrid.Columns.Add(TextColumn(nameof(CloudflareWorkerRule.Name), 90, 70));
         _rulesGrid.Columns.Add(TextColumn(nameof(CloudflareWorkerRule.GroupName), 105, 80));
-        _rulesGrid.Columns.Add(TextColumn(nameof(CloudflareWorkerRule.ApiToken), 190, 130));
+        _rulesGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            DataPropertyName = nameof(CloudflareWorkerRule.ApiTokenDisplay),
+            Name = nameof(CloudflareWorkerRule.ApiToken),
+            MinimumWidth = 130,
+            FillWeight = 190
+        });
         _rulesGrid.Columns.Add(new DataGridViewTextBoxColumn
         {
             DataPropertyName = nameof(CloudflareWorkerRule.ThresholdRequests),
@@ -399,6 +408,35 @@ public sealed class AutoSwitchForm : Form
         _activeNameEditBox.TextChanged += NameEditBoxTextChanged;
     }
 
+    private void RulesGridCellBeginEdit(object? sender, DataGridViewCellCancelEventArgs e)
+    {
+        if (e.RowIndex < 0
+            || _rulesGrid.Columns[e.ColumnIndex].Name != nameof(CloudflareWorkerRule.ApiToken)
+            || _rulesGrid.Rows[e.RowIndex].DataBoundItem is not CloudflareWorkerRule rule)
+        {
+            return;
+        }
+
+        if (rule.ApiTokenVerified)
+        {
+            e.Cancel = true;
+        }
+    }
+
+    private void RulesGridCellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+    {
+        if (e.RowIndex < 0
+            || _rulesGrid.Columns[e.ColumnIndex].Name != nameof(CloudflareWorkerRule.ApiToken)
+            || _rulesGrid.Rows[e.RowIndex].DataBoundItem is not CloudflareWorkerRule rule
+            || !rule.ApiTokenVerified)
+        {
+            return;
+        }
+
+        e.CellStyle.ForeColor = SystemColors.GrayText;
+        e.CellStyle.SelectionForeColor = SystemColors.GrayText;
+    }
+
     private void NameEditBoxTextChanged(object? sender, EventArgs e)
     {
         if (!_controlsLoaded
@@ -456,9 +494,34 @@ public sealed class AutoSwitchForm : Form
     {
         if (_rulesGrid.CurrentRow?.DataBoundItem is CloudflareWorkerRule rule)
         {
+            _rulesGrid.EndEdit();
+            if (!ConfirmRemoveRule(rule))
+            {
+                return;
+            }
+
+            var rowIndex = _rules.IndexOf(rule);
             _rules.Remove(rule);
             SaveAndRefreshFloatingUsage();
+            if (_rules.Count > 0)
+            {
+                SelectRule(_rules[Math.Clamp(rowIndex, 0, _rules.Count - 1)], beginEdit: false);
+            }
         }
+    }
+
+    private bool ConfirmRemoveRule(CloudflareWorkerRule rule)
+    {
+        var displayName = string.IsNullOrWhiteSpace(rule.DisplayName) ? "-" : rule.DisplayName;
+        var groupName = string.IsNullOrWhiteSpace(rule.GroupName) ? "-" : rule.GroupName.Trim();
+        var message = string.Format(_text.DeleteRuleConfirmMessageFormat, displayName, groupName);
+        return MessageBox.Show(
+            this,
+            message,
+            _text.DeleteRuleConfirmTitle,
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2) == DialogResult.Yes;
     }
 
     private void SaveAndRefreshFloatingUsage(int changedColumnIndex = -1)
@@ -665,6 +728,12 @@ public sealed class AutoSwitchForm : Form
 
         rule.CurrentRequests = usage.Requests;
         rule.RemainingRequests = usage.RemainingRequests;
+        if (rule.MarkApiTokenVerified())
+        {
+            _settings.Rules = _rules.ToList();
+            SettingsStore.Save(_settings);
+            _rulesGrid.InvalidateRow(_rules.IndexOf(rule));
+        }
     }
 
     private async Task UpdateCurrentSelectionStatusAsync()

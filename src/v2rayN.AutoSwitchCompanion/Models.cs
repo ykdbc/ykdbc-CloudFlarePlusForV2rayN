@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -28,19 +30,72 @@ public sealed class CloudflareWorkerRule : INotifyPropertyChanged
 {
     private long? _currentRequests;
     private long? _remainingRequests;
+    private string _apiToken = string.Empty;
+    private bool _apiTokenVerified;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public bool Enabled { get; set; } = true;
     public string Name { get; set; } = string.Empty;
     public string GroupName { get; set; } = string.Empty;
-    public string ApiToken { get; set; } = string.Empty;
+    public string ApiToken
+    {
+        get => _apiToken;
+        set
+        {
+            var next = value?.Trim() ?? string.Empty;
+            if (string.Equals(_apiToken, next, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _apiToken = next;
+            _apiTokenVerified = false;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ApiTokenDisplay));
+            OnPropertyChanged(nameof(ApiTokenVerified));
+        }
+    }
+
+    public bool ApiTokenVerified
+    {
+        get => _apiTokenVerified;
+        set
+        {
+            if (_apiTokenVerified == value)
+            {
+                return;
+            }
+
+            _apiTokenVerified = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ApiTokenDisplay));
+        }
+    }
+
     public string AccountId { get; set; } = string.Empty;
     public string ScriptName { get; set; } = string.Empty;
     public int ThresholdRequests { get; set; } = 90000;
 
     [JsonIgnore]
     public string DisplayName => Name.Trim();
+
+    [JsonIgnore]
+    public string ApiTokenDisplay
+    {
+        get => ApiTokenVerified && !string.IsNullOrWhiteSpace(ApiToken)
+            ? MaskToken(ApiToken)
+            : ApiToken;
+        set
+        {
+            if (ApiTokenVerified)
+            {
+                return;
+            }
+
+            ApiToken = value;
+        }
+    }
 
     [JsonIgnore]
     public long? CurrentRequests
@@ -82,10 +137,32 @@ public sealed class CloudflareWorkerRule : INotifyPropertyChanged
     [JsonIgnore]
     public string RemainingRequestsDisplay => RemainingRequests.HasValue ? RemainingRequests.Value.ToString("N0") : string.Empty;
 
+    public bool MarkApiTokenVerified()
+    {
+        if (string.IsNullOrWhiteSpace(ApiToken) || ApiTokenVerified)
+        {
+            return false;
+        }
+
+        ApiTokenVerified = true;
+        return true;
+    }
+
     public void ClearRuntimeUsage()
     {
         CurrentRequests = null;
         RemainingRequests = null;
+    }
+
+    private static string MaskToken(string token)
+    {
+        var trimmed = token.Trim();
+        if (trimmed.Length <= 8)
+        {
+            return "****";
+        }
+
+        return $"{trimmed[..4]}...{trimmed[^4..]}";
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -162,6 +239,8 @@ public sealed class V2rayNSelectionSnapshot
 
 public static class SettingsStore
 {
+    private const string EncryptedFormat = "v2rayN.AutoSwitchCompanion.Settings.DPAPI.v1";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -179,8 +258,15 @@ public static class SettingsStore
 
         try
         {
-            var json = File.ReadAllText(SettingsPath);
-            return Normalize(JsonSerializer.Deserialize<CompanionSettings>(json, JsonOptions) ?? new CompanionSettings());
+            var fileContent = File.ReadAllText(SettingsPath);
+            var encrypted = TryReadEncryptedPayload(fileContent, out var json);
+            var settings = Normalize(JsonSerializer.Deserialize<CompanionSettings>(json, JsonOptions) ?? new CompanionSettings());
+            if (!encrypted)
+            {
+                Save(settings);
+            }
+
+            return settings;
         }
         catch
         {
@@ -191,7 +277,9 @@ public static class SettingsStore
     public static void Save(CompanionSettings settings)
     {
         var json = JsonSerializer.Serialize(settings, JsonOptions);
-        File.WriteAllText(SettingsPath, json);
+        var payload = ProtectedSettingsPayload.Create(json);
+        var encryptedJson = JsonSerializer.Serialize(payload, JsonOptions);
+        File.WriteAllText(SettingsPath, encryptedJson);
     }
 
     private static CompanionSettings Normalize(CompanionSettings settings)
@@ -207,6 +295,59 @@ public static class SettingsStore
         }
 
         return settings;
+    }
+
+    private static bool TryReadEncryptedPayload(string fileContent, out string json)
+    {
+        using var doc = JsonDocument.Parse(fileContent);
+        if (!doc.RootElement.TryGetProperty("format", out var formatElement)
+            || !string.Equals(formatElement.GetString(), EncryptedFormat, StringComparison.Ordinal))
+        {
+            json = fileContent;
+            return false;
+        }
+
+        if (!doc.RootElement.TryGetProperty("protectedData", out var protectedDataElement))
+        {
+            throw new InvalidOperationException("Protected settings payload is missing.");
+        }
+
+        json = SettingsProtector.Unprotect(protectedDataElement.GetString() ?? string.Empty);
+        return true;
+    }
+
+    private sealed class ProtectedSettingsPayload
+    {
+        public string Format { get; init; } = EncryptedFormat;
+        public string Scope { get; init; } = "CurrentUser";
+        public string ProtectedData { get; init; } = string.Empty;
+
+        public static ProtectedSettingsPayload Create(string json)
+        {
+            return new ProtectedSettingsPayload
+            {
+                ProtectedData = SettingsProtector.Protect(json)
+            };
+        }
+    }
+}
+
+internal static class SettingsProtector
+{
+    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("CloudFlarePlusForV2rayN.AutoSwitchCompanion.Settings.v1");
+
+    public static string Protect(string value)
+    {
+        var bytes = Encoding.UTF8.GetBytes(value);
+        var protectedBytes = ProtectedData.Protect(bytes, Entropy, DataProtectionScope.CurrentUser);
+        return Convert.ToBase64String(protectedBytes);
+    }
+
+    public static string Unprotect(string protectedValue)
+    {
+        var protectedBytes = Convert.FromBase64String(protectedValue);
+        var bytes = ProtectedData.Unprotect(protectedBytes, Entropy, DataProtectionScope.CurrentUser);
+        return Encoding.UTF8.GetString(bytes);
     }
 }
 
