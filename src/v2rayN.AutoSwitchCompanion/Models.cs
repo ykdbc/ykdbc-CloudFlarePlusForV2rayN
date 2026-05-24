@@ -263,14 +263,15 @@ public static class SettingsStore
             var settings = Normalize(JsonSerializer.Deserialize<CompanionSettings>(json, JsonOptions) ?? new CompanionSettings());
             if (!encrypted)
             {
+                BackupPlainSettingsBeforeEncryption();
                 Save(settings);
             }
 
             return settings;
         }
-        catch
+        catch (Exception ex)
         {
-            return new CompanionSettings();
+            throw new InvalidOperationException($"Failed to load companion settings from {SettingsPath}: {ex.Message}", ex);
         }
     }
 
@@ -297,23 +298,44 @@ public static class SettingsStore
         return settings;
     }
 
+    private static void BackupPlainSettingsBeforeEncryption()
+    {
+        var backupPath = $"{SettingsPath}.plain-before-encrypt-{DateTime.Now:yyyyMMddHHmmss}.bak";
+        File.Copy(SettingsPath, backupPath, overwrite: false);
+    }
+
     private static bool TryReadEncryptedPayload(string fileContent, out string json)
     {
         using var doc = JsonDocument.Parse(fileContent);
-        if (!doc.RootElement.TryGetProperty("format", out var formatElement)
+        if (!TryGetPropertyIgnoreCase(doc.RootElement, "format", out var formatElement)
             || !string.Equals(formatElement.GetString(), EncryptedFormat, StringComparison.Ordinal))
         {
             json = fileContent;
             return false;
         }
 
-        if (!doc.RootElement.TryGetProperty("protectedData", out var protectedDataElement))
+        if (!TryGetPropertyIgnoreCase(doc.RootElement, "protectedData", out var protectedDataElement))
         {
             throw new InvalidOperationException("Protected settings payload is missing.");
         }
 
         json = SettingsProtector.Unprotect(protectedDataElement.GetString() ?? string.Empty);
         return true;
+    }
+
+    private static bool TryGetPropertyIgnoreCase(JsonElement element, string propertyName, out JsonElement value)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
     }
 
     private sealed class ProtectedSettingsPayload

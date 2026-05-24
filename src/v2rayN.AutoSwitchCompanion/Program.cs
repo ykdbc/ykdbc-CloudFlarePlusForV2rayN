@@ -42,8 +42,16 @@ internal static class Program
         Application.SetHighDpiMode(HighDpiMode.SystemAware);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        Application.Run(new AutoSwitchForm());
-        return 0;
+        try
+        {
+            Application.Run(new AutoSwitchForm());
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, WindowsShellIdentity.ProductTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return 2;
+        }
     }
 
     private static bool TryRedirectToTaskbarExecutable(string[] args)
