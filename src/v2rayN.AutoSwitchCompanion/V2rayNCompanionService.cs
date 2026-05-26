@@ -115,6 +115,7 @@ public sealed class V2rayNCompanionService
                 GroupName = sub?.Remarks ?? string.Empty,
                 ProfileId = active?.IndexId ?? config.IndexId ?? string.Empty,
                 ProfileName = active?.Remarks ?? string.Empty,
+                ProfileIpInfo = profileEx?.IpInfo ?? string.Empty,
                 Delay = profileEx?.Delay ?? 0,
                 Speed = profileEx?.Speed ?? 0
             };
@@ -333,6 +334,7 @@ public sealed class V2rayNCompanionService
             GroupName = sub.Remarks,
             ProfileId = profile.IndexId,
             ProfileName = profile.Remarks,
+            ProfileIpInfo = profileEx?.IpInfo ?? string.Empty,
             Delay = profileEx?.Delay ?? 0,
             Speed = profileEx?.Speed ?? 0
         };

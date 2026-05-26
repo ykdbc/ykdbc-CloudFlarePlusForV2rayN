@@ -191,6 +191,7 @@ public sealed class FloatingUsageState
     public string DisplayName { get; init; } = string.Empty;
     public string Message { get; init; } = string.Empty;
     public string ProfileName { get; init; } = string.Empty;
+    public string IpInfoPrefixDisplay { get; init; } = string.Empty;
     public string DelayDisplay { get; init; } = string.Empty;
     public string SpeedDisplay { get; init; } = string.Empty;
     public long Requests { get; init; }
@@ -227,14 +228,48 @@ public sealed class V2rayNSelectionSnapshot
     public string GroupName { get; init; } = string.Empty;
     public string ProfileId { get; init; } = string.Empty;
     public string ProfileName { get; init; } = string.Empty;
+    public string ProfileIpInfo { get; init; } = string.Empty;
     public int Delay { get; init; }
     public decimal Speed { get; init; }
+
+    [JsonIgnore]
+    public string IpInfoPrefixDisplay => ExtractIpInfoPrefix(ProfileIpInfo);
 
     [JsonIgnore]
     public string DelayDisplay => Delay > 0 ? $"{Delay} ms" : string.Empty;
 
     [JsonIgnore]
     public string SpeedDisplay => Speed > 0 ? $"{Speed:N2} MB/s" : string.Empty;
+
+    private static string ExtractIpInfoPrefix(string ipInfo)
+    {
+        var value = ipInfo.Trim();
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var open = value.IndexOf('(');
+        if (open >= 0)
+        {
+            var close = value.IndexOf(')', open + 1);
+            if (close > open + 1)
+            {
+                var countryCode = value[(open + 1)..close].Trim();
+                return countryCode.Length <= 2
+                    ? countryCode
+                    : countryCode[..2];
+            }
+        }
+
+        var text = new string(value.Where(char.IsLetterOrDigit).Take(2).ToArray());
+        if (!string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        return value.Length <= 2 ? value : value[..2];
+    }
 }
 
 public static class SettingsStore

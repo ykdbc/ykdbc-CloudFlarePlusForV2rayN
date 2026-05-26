@@ -439,6 +439,11 @@ public sealed class FloatingUsageWindow : Form
         var delayText = _state.HasMatchingRule && !_state.IsError
             ? (string.IsNullOrWhiteSpace(_state.DelayDisplay) ? "-" : _state.DelayDisplay)
             : string.Empty;
+        if (!string.IsNullOrWhiteSpace(delayText) && !string.IsNullOrWhiteSpace(_state.IpInfoPrefixDisplay))
+        {
+            delayText = $"{_state.IpInfoPrefixDisplay} {delayText}";
+        }
+
         var speedText = _state.HasMatchingRule && !_state.IsError
             ? (string.IsNullOrWhiteSpace(_state.SpeedDisplay) ? "-" : _state.SpeedDisplay)
             : string.Empty;

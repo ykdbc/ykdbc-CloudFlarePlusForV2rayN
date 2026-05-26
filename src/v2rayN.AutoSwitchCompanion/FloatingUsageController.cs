@@ -174,6 +174,7 @@ public sealed class FloatingUsageController : IDisposable
         {
             DisplayName = currentRule.DisplayName,
             ProfileName = selection.ProfileName,
+            IpInfoPrefixDisplay = selection.IpInfoPrefixDisplay,
             DelayDisplay = selection.DelayDisplay,
             SpeedDisplay = selection.SpeedDisplay,
             Requests = usage.Requests,
@@ -203,6 +204,7 @@ public sealed class FloatingUsageController : IDisposable
         {
             DisplayName = displayName,
             ProfileName = _lastState.ProfileName,
+            IpInfoPrefixDisplay = _lastState.IpInfoPrefixDisplay,
             DelayDisplay = _lastState.DelayDisplay,
             SpeedDisplay = _lastState.SpeedDisplay,
             Requests = _lastState.Requests,

@@ -28,6 +28,11 @@ internal static class Program
             return await RunCloudflareTestAsync();
         }
 
+        if (args.Any(t => string.Equals(t, "--selection-test", StringComparison.OrdinalIgnoreCase)))
+        {
+            return await RunSelectionTestAsync();
+        }
+
         if (args.Any(t => string.Equals(t, "--simulate-switch", StringComparison.OrdinalIgnoreCase)))
         {
             return await RunSwitchSimulationAsync(args);
@@ -165,6 +170,36 @@ internal static class Program
                 : "Cloudflare test completed successfully.");
             await File.WriteAllLinesAsync(logPath, lines);
             return hasFailure ? 4 : 0;
+        }
+        catch (Exception ex)
+        {
+            lines.Add(ex.ToString());
+            await File.WriteAllLinesAsync(logPath, lines);
+            return 2;
+        }
+    }
+
+    private static async Task<int> RunSelectionTestAsync()
+    {
+        var logPath = Path.Combine(V2rayNHost.HostDirectory, "autoswitch-companion.selection-test.log");
+        var lines = new List<string>
+        {
+            $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Selection test started.",
+            $"Host directory: {V2rayNHost.HostDirectory}"
+        };
+
+        try
+        {
+            var service = new V2rayNCompanionService(message => lines.Add(message));
+            var selection = await service.GetCurrentSelectionAsync();
+            lines.Add($"Current group: {selection.GroupName}");
+            lines.Add($"Current profile: {selection.ProfileName}");
+            lines.Add($"IP info prefix: {selection.IpInfoPrefixDisplay}");
+            lines.Add($"Delay: {selection.DelayDisplay}");
+            lines.Add($"Speed: {selection.SpeedDisplay}");
+            lines.Add("Selection test completed successfully.");
+            await File.WriteAllLinesAsync(logPath, lines);
+            return 0;
         }
         catch (Exception ex)
         {
