@@ -16,6 +16,17 @@ public sealed class UiText
         CheckMinutes = "检查间隔(分钟)",
         TestTimeoutMinutes = "测速超时(分钟)",
         RestartV2rayNAfterSwitch = "切换后重启 v2rayN",
+        PasswallSsh = "iStoreOS / Passwall SSH",
+        PasswallEnabled = "启用 Passwall 同步",
+        PasswallHost = "主机",
+        PasswallPort = "端口",
+        PasswallUser = "用户",
+        PasswallPassword = "密码",
+        PasswallPrivateKey = "私钥",
+        PasswallRestartAfterSwitch = "切换后重启 Passwall",
+        PasswallSwitchUdpWithTcp = "同步 UDP 节点",
+        TestPasswall = "测试 Passwall",
+        PasswallGroup = "passwallgroup",
         Enabled = "启用",
         Name = "显示名称",
         GroupName = "v2rayN 分组名",
@@ -62,6 +73,17 @@ public sealed class UiText
         CheckMinutes = "Check minutes",
         TestTimeoutMinutes = "Test timeout minutes",
         RestartV2rayNAfterSwitch = "Restart v2rayN after switch",
+        PasswallSsh = "iStoreOS / Passwall SSH",
+        PasswallEnabled = "Enable Passwall sync",
+        PasswallHost = "Host",
+        PasswallPort = "Port",
+        PasswallUser = "User",
+        PasswallPassword = "Password",
+        PasswallPrivateKey = "Private key",
+        PasswallRestartAfterSwitch = "Restart Passwall after switch",
+        PasswallSwitchUdpWithTcp = "Switch UDP with TCP",
+        TestPasswall = "Test Passwall",
+        PasswallGroup = "passwallgroup",
         Enabled = "Enabled",
         Name = "Name",
         GroupName = "v2rayN group name",
@@ -106,6 +128,17 @@ public sealed class UiText
     public required string CheckMinutes { get; init; }
     public required string TestTimeoutMinutes { get; init; }
     public required string RestartV2rayNAfterSwitch { get; init; }
+    public required string PasswallSsh { get; init; }
+    public required string PasswallEnabled { get; init; }
+    public required string PasswallHost { get; init; }
+    public required string PasswallPort { get; init; }
+    public required string PasswallUser { get; init; }
+    public required string PasswallPassword { get; init; }
+    public required string PasswallPrivateKey { get; init; }
+    public required string PasswallRestartAfterSwitch { get; init; }
+    public required string PasswallSwitchUdpWithTcp { get; init; }
+    public required string TestPasswall { get; init; }
+    public required string PasswallGroup { get; init; }
     public required string Enabled { get; init; }
     public required string Name { get; init; }
     public required string GroupName { get; init; }

@@ -16,6 +16,21 @@ public sealed class AutoSwitchForm : Form
     private readonly NumericUpDown _checkIntervalBox = new();
     private readonly NumericUpDown _timeoutBox = new();
     private readonly CheckBox _autoRestartBox = new();
+    private readonly GroupBox _passwallGroupBox = new();
+    private readonly CheckBox _passwallEnabledBox = new();
+    private readonly Label _passwallHostLabel = new();
+    private readonly Label _passwallPortLabel = new();
+    private readonly Label _passwallUserLabel = new();
+    private readonly Label _passwallPasswordLabel = new();
+    private readonly Label _passwallPrivateKeyLabel = new();
+    private readonly TextBox _passwallHostBox = new();
+    private readonly NumericUpDown _passwallPortBox = new();
+    private readonly TextBox _passwallUserBox = new();
+    private readonly TextBox _passwallPasswordBox = new();
+    private readonly TextBox _passwallPrivateKeyBox = new();
+    private readonly CheckBox _passwallRestartBox = new();
+    private readonly CheckBox _passwallSwitchUdpBox = new();
+    private readonly Button _testPasswallButton = new();
     private readonly DataGridView _rulesGrid = new();
     private readonly TextBox _logBox = new();
     private readonly Button _startButton = new();
@@ -38,6 +53,7 @@ public sealed class AutoSwitchForm : Form
     private readonly SemaphoreSlim _ruleUsageRefreshLock = new(1, 1);
     private readonly BindingList<CloudflareWorkerRule> _rules;
     private readonly V2rayNCompanionService _v2rayN;
+    private readonly PasswallSshService _passwall;
     private readonly AutoSwitchOrchestrator _orchestrator;
     private readonly CloudflareAnalyticsClient _cloudflare = new();
     private readonly FloatingUsageWindow _floatingWindow;
@@ -60,15 +76,16 @@ public sealed class AutoSwitchForm : Form
         _rules = new BindingList<CloudflareWorkerRule>(_settings.Rules);
         _appIcon = AppIconProvider.Load();
         _v2rayN = new V2rayNCompanionService(Log);
-        _orchestrator = new AutoSwitchOrchestrator(_v2rayN, Log, UpdateRuleUsage);
+        _passwall = new PasswallSshService(Log);
+        _orchestrator = new AutoSwitchOrchestrator(_v2rayN, _passwall, Log, UpdateRuleUsage);
         _floatingWindow = new FloatingUsageWindow();
         _floatingController = new FloatingUsageController(_floatingWindow, _v2rayN, Log, UpdateRuleUsage);
 
         Icon = _appIcon;
         Text = WindowsShellIdentity.ProductTitle;
         Width = 1180;
-        Height = 760;
-        MinimumSize = new Size(980, 620);
+        Height = 820;
+        MinimumSize = new Size(1040, 700);
         StartPosition = FormStartPosition.CenterScreen;
 
         BuildLayout();
@@ -86,10 +103,11 @@ public sealed class AutoSwitchForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 5,
+            RowCount = 6,
             Padding = new Padding(10)
         };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, RulesGridHeight()));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -126,6 +144,7 @@ public sealed class AutoSwitchForm : Form
         settingsPanel.Controls.Add(_timeoutBox, 5, 0);
 
         ConfigureGrid();
+        ConfigurePasswallPanel();
 
         var buttons = new FlowLayoutPanel
         {
@@ -187,11 +206,77 @@ public sealed class AutoSwitchForm : Form
         _logBox.Font = new Font(FontFamily.GenericMonospace, 9);
 
         root.Controls.Add(settingsPanel, 0, 0);
-        root.Controls.Add(_rulesGrid, 0, 1);
-        root.Controls.Add(buttons, 0, 2);
-        root.Controls.Add(_logBox, 0, 3);
-        root.Controls.Add(statusRow, 0, 4);
+        root.Controls.Add(_passwallGroupBox, 0, 1);
+        root.Controls.Add(_rulesGrid, 0, 2);
+        root.Controls.Add(buttons, 0, 3);
+        root.Controls.Add(_logBox, 0, 4);
+        root.Controls.Add(statusRow, 0, 5);
         Controls.Add(root);
+    }
+
+    private void ConfigurePasswallPanel()
+    {
+        _passwallGroupBox.Dock = DockStyle.Top;
+        _passwallGroupBox.AutoSize = true;
+        _passwallGroupBox.Padding = new Padding(8);
+
+        var panel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 10
+        };
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+        _passwallEnabledBox.AutoSize = true;
+        _passwallEnabledBox.Margin = new Padding(0, 8, 12, 4);
+        _passwallRestartBox.AutoSize = true;
+        _passwallRestartBox.Margin = new Padding(8, 8, 12, 4);
+        _passwallSwitchUdpBox.AutoSize = true;
+        _passwallSwitchUdpBox.Margin = new Padding(8, 8, 12, 4);
+        _passwallHostBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        _passwallUserBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        _passwallPasswordBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        _passwallPrivateKeyBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        _passwallPasswordBox.UseSystemPasswordChar = true;
+        _passwallPortBox.Minimum = 1;
+        _passwallPortBox.Maximum = 65535;
+        _passwallPortBox.Width = 70;
+        ConfigureButton(_testPasswallButton, async (_, _) => await TestPasswallFromUiAsync());
+
+        panel.Controls.Add(_passwallEnabledBox, 0, 0);
+        panel.SetColumnSpan(_passwallEnabledBox, 2);
+        panel.Controls.Add(_passwallHostLabel, 2, 0);
+        panel.Controls.Add(_passwallHostBox, 3, 0);
+        panel.SetColumnSpan(_passwallHostBox, 3);
+        panel.Controls.Add(_passwallPortLabel, 6, 0);
+        panel.Controls.Add(_passwallPortBox, 7, 0);
+        panel.Controls.Add(_testPasswallButton, 9, 0);
+
+        panel.Controls.Add(_passwallUserLabel, 0, 1);
+        panel.Controls.Add(_passwallUserBox, 1, 1);
+        panel.Controls.Add(_passwallPasswordLabel, 2, 1);
+        panel.Controls.Add(_passwallPasswordBox, 3, 1);
+        panel.SetColumnSpan(_passwallPasswordBox, 3);
+        panel.Controls.Add(_passwallPrivateKeyLabel, 6, 1);
+        panel.Controls.Add(_passwallPrivateKeyBox, 7, 1);
+        panel.SetColumnSpan(_passwallPrivateKeyBox, 2);
+
+        panel.Controls.Add(_passwallRestartBox, 0, 2);
+        panel.SetColumnSpan(_passwallRestartBox, 3);
+        panel.Controls.Add(_passwallSwitchUdpBox, 3, 2);
+        panel.SetColumnSpan(_passwallSwitchUdpBox, 3);
+
+        _passwallGroupBox.Controls.Add(panel);
     }
 
     private void ConfigureGrid()
@@ -239,6 +324,7 @@ public sealed class AutoSwitchForm : Form
         });
         _rulesGrid.Columns.Add(TextColumn(nameof(CloudflareWorkerRule.Name), 90, 70));
         _rulesGrid.Columns.Add(TextColumn(nameof(CloudflareWorkerRule.GroupName), 105, 80));
+        _rulesGrid.Columns.Add(TextColumn(nameof(CloudflareWorkerRule.PasswallGroup), 105, 80));
         _rulesGrid.Columns.Add(new DataGridViewTextBoxColumn
         {
             DataPropertyName = nameof(CloudflareWorkerRule.ApiTokenDisplay),
@@ -328,6 +414,16 @@ public sealed class AutoSwitchForm : Form
         _checkIntervalBox.Value = Math.Clamp(_settings.DefaultCheckIntervalMinutes, 1, 1440);
         _timeoutBox.Value = Math.Clamp(_settings.SpeedTestTimeoutMinutes, 1, 180);
         _autoRestartBox.Checked = _settings.AutoRestartV2rayN;
+        _passwallEnabledBox.Checked = _settings.PasswallSsh.Enabled;
+        _passwallHostBox.Text = _settings.PasswallSsh.Host;
+        _passwallPortBox.Value = Math.Clamp(_settings.PasswallSsh.Port, 1, 65535);
+        _passwallUserBox.Text = string.IsNullOrWhiteSpace(_settings.PasswallSsh.UserName)
+            ? "root"
+            : _settings.PasswallSsh.UserName;
+        _passwallPasswordBox.Text = _settings.PasswallSsh.Password;
+        _passwallPrivateKeyBox.Text = _settings.PasswallSsh.PrivateKeyPath;
+        _passwallRestartBox.Checked = _settings.PasswallSsh.RestartAfterSwitch;
+        _passwallSwitchUdpBox.Checked = _settings.PasswallSsh.SwitchUdpWithTcp;
         _loadingLanguageSwitch = true;
         _languageSwitch.Checked = string.Equals(_settings.Language, CompanionSettings.LanguageEnglish, StringComparison.OrdinalIgnoreCase);
         _loadingLanguageSwitch = false;
@@ -342,6 +438,16 @@ public sealed class AutoSwitchForm : Form
         _checkIntervalLabel.Text = _text.CheckMinutes;
         _timeoutLabel.Text = _text.TestTimeoutMinutes;
         _autoRestartBox.Text = _text.RestartV2rayNAfterSwitch;
+        _passwallGroupBox.Text = _text.PasswallSsh;
+        _passwallEnabledBox.Text = _text.PasswallEnabled;
+        _passwallHostLabel.Text = _text.PasswallHost;
+        _passwallPortLabel.Text = _text.PasswallPort;
+        _passwallUserLabel.Text = _text.PasswallUser;
+        _passwallPasswordLabel.Text = _text.PasswallPassword;
+        _passwallPrivateKeyLabel.Text = _text.PasswallPrivateKey;
+        _passwallRestartBox.Text = _text.PasswallRestartAfterSwitch;
+        _passwallSwitchUdpBox.Text = _text.PasswallSwitchUdpWithTcp;
+        _testPasswallButton.Text = _text.TestPasswall;
         _addButton.Text = _text.AddRule;
         _removeButton.Text = _text.RemoveRule;
         _saveButton.Text = _text.Save;
@@ -359,6 +465,7 @@ public sealed class AutoSwitchForm : Form
         SetColumnHeader(nameof(CloudflareWorkerRule.Enabled), _text.Enabled);
         SetColumnHeader(nameof(CloudflareWorkerRule.Name), _text.Name);
         SetColumnHeader(nameof(CloudflareWorkerRule.GroupName), _text.GroupName);
+        SetColumnHeader(nameof(CloudflareWorkerRule.PasswallGroup), _text.PasswallGroup);
         SetColumnHeader(nameof(CloudflareWorkerRule.ApiToken), _text.ApiToken);
         SetColumnHeader(nameof(CloudflareWorkerRule.ThresholdRequests), _text.Threshold);
         SetColumnHeader(nameof(CloudflareWorkerRule.CurrentRequestsDisplay), _text.CurrentUsage);
@@ -464,6 +571,14 @@ public sealed class AutoSwitchForm : Form
         _settings.DefaultCheckIntervalMinutes = (int)_checkIntervalBox.Value;
         _settings.SpeedTestTimeoutMinutes = (int)_timeoutBox.Value;
         _settings.AutoRestartV2rayN = _autoRestartBox.Checked;
+        _settings.PasswallSsh.Enabled = _passwallEnabledBox.Checked;
+        _settings.PasswallSsh.Host = _passwallHostBox.Text.Trim();
+        _settings.PasswallSsh.Port = (int)_passwallPortBox.Value;
+        _settings.PasswallSsh.UserName = _passwallUserBox.Text.Trim();
+        _settings.PasswallSsh.Password = _passwallPasswordBox.Text;
+        _settings.PasswallSsh.PrivateKeyPath = _passwallPrivateKeyBox.Text.Trim();
+        _settings.PasswallSsh.RestartAfterSwitch = _passwallRestartBox.Checked;
+        _settings.PasswallSsh.SwitchUdpWithTcp = _passwallSwitchUdpBox.Checked;
         _settings.Language = _languageSwitch.Checked
             ? CompanionSettings.LanguageEnglish
             : CompanionSettings.LanguageChinese;
@@ -584,6 +699,27 @@ public sealed class AutoSwitchForm : Form
         finally
         {
             SetBusy(false);
+        }
+    }
+
+    private async Task TestPasswallFromUiAsync()
+    {
+        SaveFromControls(refreshFloatingUsage: false);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(10, _settings.PasswallSsh.CommandTimeoutSeconds)));
+        _testPasswallButton.Enabled = false;
+        try
+        {
+            await _passwall.TestConnectionAsync(_settings.PasswallSsh, cts.Token);
+            var groups = await _passwall.ListGroupsAsync(_settings.PasswallSsh, cts.Token);
+            Log($"Passwall groups: {(groups.Count == 0 ? "<none>" : string.Join(", ", groups))}");
+        }
+        catch (Exception ex)
+        {
+            Log(ex.Message);
+        }
+        finally
+        {
+            _testPasswallButton.Enabled = true;
         }
     }
 
@@ -799,12 +935,39 @@ public sealed class AutoSwitchForm : Form
             if (selection != null)
             {
                 SetCurrentSelectionStatus(selection);
+                await SyncPasswallForGroupAsync(groupName);
                 await _floatingController.RefreshAsync();
             }
         }
         catch (Exception ex)
         {
             Log(ex.Message);
+        }
+    }
+
+    private async Task SyncPasswallForGroupAsync(string groupName)
+    {
+        if (!_settings.PasswallSsh.Enabled)
+        {
+            return;
+        }
+
+        var rule = _rules.FirstOrDefault(t =>
+            t.Enabled && string.Equals(t.GroupName, groupName, StringComparison.OrdinalIgnoreCase));
+        if (rule == null)
+        {
+            Log($"Passwall sync skipped: no rule matched v2rayN group '{groupName}'.");
+            return;
+        }
+
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(10, _settings.PasswallSsh.CommandTimeoutSeconds)));
+            await _passwall.SwitchToBestNodeAsync(_settings.PasswallSsh, rule.PasswallGroup, cts.Token);
+        }
+        catch (Exception ex)
+        {
+            Log($"Passwall sync failed: {ex.Message}");
         }
     }
 

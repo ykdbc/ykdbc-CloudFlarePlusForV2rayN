@@ -4,16 +4,19 @@ public sealed class AutoSwitchOrchestrator
 {
     private readonly CloudflareAnalyticsClient _cloudflare = new();
     private readonly V2rayNCompanionService _v2rayN;
+    private readonly PasswallSshService _passwall;
     private readonly Action<string> _log;
     private readonly Action<CloudflareWorkerRule, WorkerUsage>? _usageUpdated;
     private readonly SemaphoreSlim _runLock = new(1, 1);
 
     public AutoSwitchOrchestrator(
         V2rayNCompanionService v2rayN,
+        PasswallSshService passwall,
         Action<string> log,
         Action<CloudflareWorkerRule, WorkerUsage>? usageUpdated = null)
     {
         _v2rayN = v2rayN;
+        _passwall = passwall;
         _log = log;
         _usageUpdated = usageUpdated;
     }
@@ -89,15 +92,21 @@ public sealed class AutoSwitchOrchestrator
                 return;
             }
 
-            var eligibleGroups = GetEligibleGroups(enabledRules, usageMap);
-            if (eligibleGroups.Count == 0)
+            var eligibleRules = GetEligibleRules(enabledRules, usageMap);
+            if (eligibleRules.Count == 0)
             {
                 _log($"No group is below its threshold and has more than {CompanionSettings.MinimumRemainingRequestsForSpeedTest:N0} remaining requests.");
                 return;
             }
 
+            var eligibleGroups = eligibleRules
+                .Select(t => t.GroupName.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToList();
             _log($"Startup initialization: testing all profiles in groups below threshold and with remaining > {CompanionSettings.MinimumRemainingRequestsForSpeedTest:N0}: {string.Join(", ", eligibleGroups)}");
-            await _v2rayN.SwitchToBestProfileAcrossGroupsAsync(eligibleGroups, settings, cancellationToken);
+            var selected = await _v2rayN.SwitchToBestProfileAcrossGroupsAsync(eligibleGroups, settings, cancellationToken);
+            await SyncPasswallForSelectedProfileAsync(settings, eligibleRules, selected, cancellationToken);
         }
         finally
         {
@@ -137,18 +146,58 @@ public sealed class AutoSwitchOrchestrator
             return;
         }
 
-        var eligibleGroups = GetEligibleGroups(enabledRules, usageMap);
-        if (eligibleGroups.Count == 0)
+        var eligibleRules = GetEligibleRules(enabledRules, usageMap);
+        if (eligibleRules.Count == 0)
         {
             _log($"Current group usage {currentUsage.Requests:N0} is above threshold {currentRule.ThresholdRequests:N0}, but no group is below its threshold and has more than {CompanionSettings.MinimumRemainingRequestsForSpeedTest:N0} remaining requests.");
             return;
         }
 
+        var eligibleGroups = eligibleRules
+            .Select(t => t.GroupName.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         _log($"Current group usage {currentUsage.Requests:N0} is above threshold {currentRule.ThresholdRequests:N0}. Re-selecting from groups below threshold and with remaining > {CompanionSettings.MinimumRemainingRequestsForSpeedTest:N0}: {string.Join(", ", eligibleGroups)}");
-        await _v2rayN.SwitchToBestProfileAcrossGroupsAsync(eligibleGroups, settings, cancellationToken);
+        var selected = await _v2rayN.SwitchToBestProfileAcrossGroupsAsync(eligibleGroups, settings, cancellationToken);
+        await SyncPasswallForSelectedProfileAsync(settings, eligibleRules, selected, cancellationToken);
     }
 
-    private static List<string> GetEligibleGroups(
+    private async Task SyncPasswallForSelectedProfileAsync(
+        CompanionSettings settings,
+        List<CloudflareWorkerRule> eligibleRules,
+        CandidateProfile? selected,
+        CancellationToken cancellationToken)
+    {
+        if (selected == null)
+        {
+            return;
+        }
+
+        if (!settings.PasswallSsh.Enabled)
+        {
+            return;
+        }
+
+        var selectedRule = eligibleRules.FirstOrDefault(t =>
+            string.Equals(t.GroupName, selected.GroupName, StringComparison.OrdinalIgnoreCase));
+        if (selectedRule == null)
+        {
+            _log($"Passwall sync skipped: no rule matched selected v2rayN group '{selected.GroupName}'.");
+            return;
+        }
+
+        try
+        {
+            await _passwall.SwitchToBestNodeAsync(settings.PasswallSsh, selectedRule.PasswallGroup, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _log($"Passwall sync failed: {ex.Message}");
+        }
+    }
+
+    private static List<CloudflareWorkerRule> GetEligibleRules(
         List<CloudflareWorkerRule> enabledRules,
         Dictionary<CloudflareWorkerRule, WorkerUsage> usageMap)
     {
@@ -156,9 +205,9 @@ public sealed class AutoSwitchOrchestrator
             .Where(t => usageMap.TryGetValue(t, out var usage)
                 && usage.Requests <= t.ThresholdRequests
                 && usage.RemainingRequests > CompanionSettings.MinimumRemainingRequestsForSpeedTest)
-            .Select(t => t.GroupName.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase)
+            .GroupBy(t => t.GroupName.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(t => t.First())
+            .OrderBy(t => t.GroupName, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 

@@ -4,11 +4,24 @@
   "speedTestTimeoutMinutes": 20,
   "speedTestUrl": "https://cdn.cloudflare.steamstatic.com/steam/apps/256843155/movie_max.mp4",
   "language": "zh-CN",
+  "passwallSsh": {
+    "enabled": false,
+    "host": "test.ykdbc.com",
+    "port": 250,
+    "userName": "root",
+    "password": "",
+    "privateKeyPath": "",
+    "urlTestArgument": "urltest_node",
+    "restartAfterSwitch": true,
+    "switchUdpWithTcp": false,
+    "commandTimeoutSeconds": 120
+  },
   "rules": [
     {
       "enabled": true,
       "name": "worker-a",
       "groupName": "Cloudflare-A",
+      "passwallGroup": "Passwall-A",
       "apiToken": "paste-token-a-here",
       "accountId": "",
       "scriptName": "",
@@ -18,6 +31,7 @@
       "enabled": true,
       "name": "worker-b",
       "groupName": "Cloudflare-B",
+      "passwallGroup": "Passwall-B",
       "apiToken": "paste-token-b-here",
       "accountId": "",
       "scriptName": "",

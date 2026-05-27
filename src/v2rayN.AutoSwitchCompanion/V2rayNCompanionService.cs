@@ -126,7 +126,7 @@ public sealed class V2rayNCompanionService
         }
     }
 
-    public async Task<bool> SwitchToGroupByMixedTestAsync(string groupName, CompanionSettings settings, CancellationToken cancellationToken)
+    public async Task<CandidateProfile?> SwitchToGroupByMixedTestAsync(string groupName, CompanionSettings settings, CancellationToken cancellationToken)
     {
         await InitializeAsync();
         await EnsureSpeedTestUrlAsync(settings.SpeedTestUrl);
@@ -136,7 +136,7 @@ public sealed class V2rayNCompanionService
         if (sub == null)
         {
             _log($"Target subscription group not found: {groupName}");
-            return false;
+            return null;
         }
 
         var profiles = await SQLiteHelper.Instance.TableAsync<ProfileItem>()
@@ -150,13 +150,13 @@ public sealed class V2rayNCompanionService
         if (profiles.Count == 0)
         {
             _log($"Target group has no profiles: {groupName}");
-            return false;
+            return null;
         }
 
         _log($"Running mixed latency/speed test for group '{groupName}' with {profiles.Count} profiles.");
         if (!await RunMixedTestAsync(profiles, settings, cancellationToken))
         {
-            return false;
+            return null;
         }
 
         var profileGroups = new Dictionary<string, ProfileGroupInfo>(StringComparer.OrdinalIgnoreCase);
@@ -169,7 +169,7 @@ public sealed class V2rayNCompanionService
         if (best == null)
         {
             _log("No usable speed test result was found.");
-            return false;
+            return null;
         }
 
         var config = ReloadConfigFromDisk();
@@ -177,7 +177,7 @@ public sealed class V2rayNCompanionService
         if (await ConfigHandler.SetDefaultServerIndex(config, best.IndexId) != 0)
         {
             _log("Failed to set default server.");
-            return false;
+            return null;
         }
 
         _log($"Selected '{best.Remarks}' in group '{best.GroupName}' delay={best.Delay}ms speed={best.Speed} MB/s.");
@@ -190,10 +190,10 @@ public sealed class V2rayNCompanionService
             _log("Default server was saved. Reload v2rayN manually if it is already running.");
         }
 
-        return true;
+        return best;
     }
 
-    public async Task<bool> SwitchToBestProfileAcrossGroupsAsync(
+    public async Task<CandidateProfile?> SwitchToBestProfileAcrossGroupsAsync(
         IReadOnlyCollection<string> groupNames,
         CompanionSettings settings,
         CancellationToken cancellationToken)
@@ -209,7 +209,7 @@ public sealed class V2rayNCompanionService
         if (requestedGroups.Count == 0)
         {
             _log("No target groups were provided for speed testing.");
-            return false;
+            return null;
         }
 
         var subscriptions = await SQLiteHelper.Instance.TableAsync<SubItem>().ToListAsync();
@@ -255,20 +255,20 @@ public sealed class V2rayNCompanionService
         if (profiles.Count == 0)
         {
             _log("No profiles were found in the eligible groups.");
-            return false;
+            return null;
         }
 
         _log($"Running mixed latency/speed test for {matchedGroups.Count} groups with {profiles.Count} profiles.");
         if (!await RunMixedTestAsync(profiles, settings, cancellationToken))
         {
-            return false;
+            return null;
         }
 
         var best = await SelectBestProfileAsync(profiles, profileGroups);
         if (best == null)
         {
             _log("No usable speed test result was found.");
-            return false;
+            return null;
         }
 
         var config = ReloadConfigFromDisk();
@@ -276,7 +276,7 @@ public sealed class V2rayNCompanionService
         if (await ConfigHandler.SetDefaultServerIndex(config, best.IndexId) != 0)
         {
             _log("Failed to set default server.");
-            return false;
+            return null;
         }
 
         _log($"Selected '{best.Remarks}' in group '{best.GroupName}' delay={best.Delay}ms speed={best.Speed} MB/s.");
@@ -289,7 +289,7 @@ public sealed class V2rayNCompanionService
             _log("Default server was saved. Reload v2rayN manually if it is already running.");
         }
 
-        return true;
+        return best;
     }
 
     public async Task<V2rayNSelectionSnapshot?> SwitchToGroupWithoutSpeedTestAsync(string groupName)

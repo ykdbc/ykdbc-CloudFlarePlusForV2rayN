@@ -23,7 +23,35 @@ public sealed class CompanionSettings
     public int SpeedTestTimeoutMinutes { get; set; } = 20;
     public string SpeedTestUrl { get; set; } = DefaultSpeedTestUrl;
     public string Language { get; set; } = LanguageChinese;
+    public PasswallSshSettings PasswallSsh { get; set; } = new();
     public List<CloudflareWorkerRule> Rules { get; set; } = [];
+}
+
+public sealed class PasswallSshSettings
+{
+    public bool Enabled { get; set; }
+    public string Host { get; set; } = string.Empty;
+    public int Port { get; set; } = 22;
+    public string UserName { get; set; } = "root";
+    public string Password { get; set; } = string.Empty;
+    public string PrivateKeyPath { get; set; } = string.Empty;
+    public string UrlTestArgument { get; set; } = "urltest_node";
+    public bool RestartAfterSwitch { get; set; } = true;
+    public bool SwitchUdpWithTcp { get; set; }
+    public int CommandTimeoutSeconds { get; set; } = 120;
+
+    [JsonIgnore]
+    public bool HasCredentials => !string.IsNullOrWhiteSpace(Password)
+        || !string.IsNullOrWhiteSpace(PrivateKeyPath);
+
+    [JsonIgnore]
+    public bool CanConnect => !string.IsNullOrWhiteSpace(Host)
+        && Port > 0
+        && !string.IsNullOrWhiteSpace(UserName)
+        && HasCredentials;
+
+    [JsonIgnore]
+    public bool IsUsable => Enabled && CanConnect;
 }
 
 public sealed class CloudflareWorkerRule : INotifyPropertyChanged
@@ -38,6 +66,7 @@ public sealed class CloudflareWorkerRule : INotifyPropertyChanged
     public bool Enabled { get; set; } = true;
     public string Name { get; set; } = string.Empty;
     public string GroupName { get; set; } = string.Empty;
+    public string PasswallGroup { get; set; } = string.Empty;
     public string ApiToken
     {
         get => _apiToken;
@@ -328,6 +357,27 @@ public static class SettingsStore
         if (!string.Equals(settings.Language, CompanionSettings.LanguageEnglish, StringComparison.OrdinalIgnoreCase))
         {
             settings.Language = CompanionSettings.LanguageChinese;
+        }
+
+        settings.PasswallSsh ??= new PasswallSshSettings();
+        if (settings.PasswallSsh.Port < 1 || settings.PasswallSsh.Port > 65535)
+        {
+            settings.PasswallSsh.Port = 22;
+        }
+
+        if (settings.PasswallSsh.CommandTimeoutSeconds < 10)
+        {
+            settings.PasswallSsh.CommandTimeoutSeconds = 120;
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.PasswallSsh.UserName))
+        {
+            settings.PasswallSsh.UserName = "root";
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.PasswallSsh.UrlTestArgument))
+        {
+            settings.PasswallSsh.UrlTestArgument = "urltest_node";
         }
 
         return settings;

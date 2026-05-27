@@ -33,6 +33,11 @@ internal static class Program
             return await RunSelectionTestAsync();
         }
 
+        if (args.Any(t => string.Equals(t, "--passwall-test", StringComparison.OrdinalIgnoreCase)))
+        {
+            return await RunPasswallTestAsync();
+        }
+
         if (args.Any(t => string.Equals(t, "--simulate-switch", StringComparison.OrdinalIgnoreCase)))
         {
             return await RunSwitchSimulationAsync(args);
@@ -198,6 +203,48 @@ internal static class Program
             lines.Add($"Delay: {selection.DelayDisplay}");
             lines.Add($"Speed: {selection.SpeedDisplay}");
             lines.Add("Selection test completed successfully.");
+            await File.WriteAllLinesAsync(logPath, lines);
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            lines.Add(ex.ToString());
+            await File.WriteAllLinesAsync(logPath, lines);
+            return 2;
+        }
+    }
+
+    private static async Task<int> RunPasswallTestAsync()
+    {
+        var logPath = Path.Combine(V2rayNHost.HostDirectory, "autoswitch-companion.passwall-test.log");
+        var lines = new List<string>
+        {
+            $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Passwall test started.",
+            $"Settings: {SettingsStore.SettingsPath}"
+        };
+
+        try
+        {
+            var settings = SettingsStore.Load();
+            var passwall = new PasswallSshService(message => lines.Add(message));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(10, settings.PasswallSsh.CommandTimeoutSeconds)));
+            await passwall.TestConnectionAsync(settings.PasswallSsh, cts.Token);
+            var groups = await passwall.ListGroupsAsync(settings.PasswallSsh, cts.Token);
+            lines.Add($"Passwall groups: {(groups.Count == 0 ? "<none>" : string.Join(", ", groups))}");
+
+            foreach (var rule in settings.Rules.Where(t => t.Enabled && !string.IsNullOrWhiteSpace(t.PasswallGroup)))
+            {
+                try
+                {
+                    lines.Add(await passwall.TestGroupUrlTestAsync(settings.PasswallSsh, rule.PasswallGroup, cts.Token));
+                }
+                catch (Exception ex)
+                {
+                    lines.Add($"{rule.PasswallGroup}: Passwall URL test failed: {ex.Message}");
+                }
+            }
+
+            lines.Add("Passwall test completed.");
             await File.WriteAllLinesAsync(logPath, lines);
             return 0;
         }

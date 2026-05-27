@@ -23,6 +23,7 @@
 
     <ItemGroup>
         <ProjectReference Include="$(V2rayNSourceRoot)\ServiceLib\ServiceLib.csproj" />
+        <PackageReference Include="SSH.NET" Version="2025.1.0" />
     </ItemGroup>
 
 </Project>
